@@ -1,0 +1,79 @@
+blueprint:
+  name: Philips Hue Smart Button ROM001 — ZHA
+  description: >-
+    Blueprint pour le Philips Hue Smart Button ROM001 utilisé directement avec
+    ZHA. Gère le clic court, l'appui long (avec répétition des événements hold)
+    et le relâchement après un appui long. Écoute uniquement le cluster privé
+    Philips/Signify 0xFC00 afin d'ignorer les événements On/Off parasites.
+  domain: automation
+  source_url: https://www.home-assistant.io/docs/automation/blueprints/
+
+  input:
+    controller:
+      name: Hue Smart Button
+      description: Le Philips Hue Smart Button ROM001.
+      selector:
+        device:
+          filter:
+            - integration: zha
+              manufacturer: Signify Netherlands B.V.
+              model: ROM001
+
+    short_press:
+      name: Clic court
+      description: Action exécutée lors d'un clic court.
+      default: []
+      selector:
+        action: {}
+
+    hold:
+      name: Appui long / maintien
+      description: >-
+        Action exécutée à chaque événement de maintien envoyé par le bouton.
+        Le ROM001 envoie plusieurs événements pendant qu'il reste appuyé.
+      default: []
+      selector:
+        action: {}
+
+    long_release:
+      name: Relâchement après appui long
+      description: Action exécutée lors du relâchement après un maintien.
+      default: []
+      selector:
+        action: {}
+
+mode: parallel
+max: 20
+
+trigger:
+  - platform: event
+    event_type: zha_event
+
+condition:
+  - condition: template
+    value_template: >-
+      {% set e = trigger.event.data %}
+      {% set selected_device = device_id(controller) %}
+      {{ e.device_id == selected_device
+         and e.endpoint_id == 1
+         and e.cluster_id == 64512
+         and e.command in ['on_press', 'on_hold', 'on_long_release']
+         and e.args is defined
+         and e.args.button == 'on' }}
+
+action:
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.event.data.command == 'on_press' }}"
+        sequence: !input short_press
+
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.event.data.command == 'on_hold' }}"
+        sequence: !input hold
+
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.event.data.command == 'on_long_release' }}"
+        sequence: !input long_release
