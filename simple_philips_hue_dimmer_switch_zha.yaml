@@ -1,0 +1,185 @@
+blueprint:
+  name: Simple Philips Hue Dimmer Switch — ZHA
+  description: >
+    Controls an area using a Philips Hue Dimmer Switch connected directly to ZHA.
+
+    Buttons:
+    - Power short press: toggle synchronized lighting for the area
+    - Power hold: no action
+    - Brightness + short press: +5%
+    - Brightness + hold: +10%
+    - Brightness - short press: -5%
+    - Brightness - hold: -10%
+    - Hue/Off short press: toggle the area's natural lights helper
+    - Hue/Off hold: turn off every light in Home Assistant
+
+    The automation only provides the Dimmer Switch, the area and the
+    natural lights helper. All button behavior is defined by this blueprint.
+
+  domain: automation
+  source_url: https://github.com/REPLACE_ME/hue-rom001-zha
+
+  input:
+    controller:
+      name: Hue Dimmer Switch
+      description: Select the Philips Hue Dimmer Switch connected through ZHA.
+      selector:
+        device:
+          filter:
+            - integration: zha
+              manufacturer: Signify Netherlands B.V.
+
+    area:
+      name: Area
+      description: Area controlled by this Dimmer Switch.
+      selector:
+        area:
+
+    natural_lights:
+      name: Natural lights helper
+      description: >
+        Input boolean used to enable or disable natural lights for this area.
+      selector:
+        entity:
+          domain: input_boolean
+
+variables:
+  controller_device: !input controller
+  target_area: !input area
+  natural_lights_helper: !input natural_lights
+
+mode: parallel
+max: 20
+
+triggers:
+  - trigger: event
+    event_type: zha_event
+
+conditions:
+  - condition: template
+    value_template: >-
+      {% set e = trigger.event.data %}
+      {{ e.device_id == controller_device
+         and e.endpoint_id == 1
+         and e.cluster_id == 64512
+         and e.command in [
+           'on_short_release', 'on_hold',
+           'up_short_release', 'up_hold',
+           'down_short_release', 'down_hold',
+           'off_short_release', 'off_hold'
+         ]
+         and e.args.button in ['on', 'up', 'down', 'off'] }}
+
+actions:
+  - choose:
+      # ============================================================
+      # POWER — SHORT PRESS
+      # ============================================================
+
+      - conditions:
+          - condition: template
+            value_template: >-
+              {{ trigger.event.data.command == 'on_short_release' }}
+        sequence:
+          - action: script.toggle_eclairage_synchronise
+            data:
+              area: "{{ target_area }}"
+
+      # ============================================================
+      # POWER — HOLD
+      # ============================================================
+
+      - conditions:
+          - condition: template
+            value_template: >-
+              {{ trigger.event.data.command == 'on_hold' }}
+        sequence: []
+
+      # ============================================================
+      # BRIGHTNESS + — SHORT PRESS
+      # ============================================================
+
+      - conditions:
+          - condition: template
+            value_template: >-
+              {{ trigger.event.data.command == 'up_short_release' }}
+        sequence:
+          - action: light.turn_on
+            target:
+              area_id: !input area
+            data:
+              brightness_step_pct: 5
+
+      # ============================================================
+      # BRIGHTNESS + — HOLD
+      # ============================================================
+
+      - conditions:
+          - condition: template
+            value_template: >-
+              {{ trigger.event.data.command == 'up_hold' }}
+        sequence:
+          - action: light.turn_on
+            target:
+              area_id: !input area
+            data:
+              brightness_step_pct: 10
+
+      # ============================================================
+      # BRIGHTNESS - — SHORT PRESS
+      # ============================================================
+
+      - conditions:
+          - condition: template
+            value_template: >-
+              {{ trigger.event.data.command == 'down_short_release' }}
+        sequence:
+          - action: light.turn_on
+            target:
+              area_id: !input area
+            data:
+              brightness_step_pct: -5
+
+      # ============================================================
+      # BRIGHTNESS - — HOLD
+      # ============================================================
+
+      - conditions:
+          - condition: template
+            value_template: >-
+              {{ trigger.event.data.command == 'down_hold' }}
+        sequence:
+          - action: light.turn_on
+            target:
+              area_id: !input area
+            data:
+              brightness_step_pct: -10
+
+      # ============================================================
+      # HUE / OFF — SHORT PRESS
+      # ============================================================
+
+      - conditions:
+          - condition: template
+            value_template: >-
+              {{ trigger.event.data.command == 'off_short_release' }}
+        sequence:
+          - action: input_boolean.toggle
+            target:
+              entity_id: !input natural_lights
+
+      # ============================================================
+      # HUE / OFF — HOLD
+      # ============================================================
+
+      - conditions:
+          - condition: template
+            value_template: >-
+              {{ trigger.event.data.command == 'off_hold' }}
+        sequence:
+          - action: light.turn_off
+            target:
+              entity_id: >-
+                {{ states.light
+                   | map(attribute='entity_id')
+                   | list }}
