@@ -1,0 +1,145 @@
+blueprint:
+  name: Philips Hue Dimmer Switch — ZHA
+  description: >
+    Blueprint for a Philips Hue Dimmer Switch connected directly to ZHA.
+    Handles the four physical buttons (Power, Brightness +, Brightness -, Hue/Off)
+    with separate actions for short press and hold.
+
+    The blueprint listens to the Signify proprietary 0xFC00 cluster exposed by
+    the ZHA Philips dimmer quirk. Native On/Off, Level Control and Scene events
+    are intentionally ignored to avoid duplicate actions.
+  domain: automation
+  source_url: https://github.com/REPLACE_ME/hue-rom001-zha
+
+  input:
+    controller:
+      name: Hue Dimmer Switch
+      description: Select your Philips Hue Dimmer Switch connected through ZHA.
+      selector:
+        device:
+          filter:
+            - integration: zha
+              manufacturer: Signify Netherlands B.V.
+
+    on_short_press:
+      name: Power — short press
+      description: Action executed when the Power button is briefly pressed.
+      default: []
+      selector:
+        action: {}
+
+    on_hold:
+      name: Power — hold
+      description: Action executed for every hold event while Power is held.
+      default: []
+      selector:
+        action: {}
+
+    up_short_press:
+      name: Brightness + — short press
+      description: Action executed when Brightness + is briefly pressed.
+      default: []
+      selector:
+        action: {}
+
+    up_hold:
+      name: Brightness + — hold
+      description: Action executed for every hold event while Brightness + is held.
+      default: []
+      selector:
+        action: {}
+
+    down_short_press:
+      name: Brightness - — short press
+      description: Action executed when Brightness - is briefly pressed.
+      default: []
+      selector:
+        action: {}
+
+    down_hold:
+      name: Brightness - — hold
+      description: Action executed for every hold event while Brightness - is held.
+      default: []
+      selector:
+        action: {}
+
+    off_short_press:
+      name: Hue / Off — short press
+      description: Action executed when the Hue/Off button is briefly pressed.
+      default: []
+      selector:
+        action: {}
+
+    off_hold:
+      name: Hue / Off — hold
+      description: Action executed for every hold event while the Hue/Off button is held.
+      default: []
+      selector:
+        action: {}
+
+variables:
+  controller_device: !input controller
+
+mode: parallel
+max: 20
+
+triggers:
+  - trigger: event
+    event_type: zha_event
+
+conditions:
+  - condition: template
+    value_template: >-
+      {% set e = trigger.event.data %}
+      {{ e.device_id == controller_device
+         and e.endpoint_id == 1
+         and e.cluster_id == 64512
+         and e.command in [
+           'on_short_release', 'on_hold',
+           'up_short_release', 'up_hold',
+           'down_short_release', 'down_hold',
+           'off_short_release', 'off_hold'
+         ]
+         and e.args.button in ['on', 'up', 'down', 'off'] }}
+
+actions:
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.event.data.command == 'on_short_release' }}"
+        sequence: !input on_short_press
+
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.event.data.command == 'on_hold' }}"
+        sequence: !input on_hold
+
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.event.data.command == 'up_short_release' }}"
+        sequence: !input up_short_press
+
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.event.data.command == 'up_hold' }}"
+        sequence: !input up_hold
+
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.event.data.command == 'down_short_release' }}"
+        sequence: !input down_short_press
+
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.event.data.command == 'down_hold' }}"
+        sequence: !input down_hold
+
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.event.data.command == 'off_short_release' }}"
+        sequence: !input off_short_press
+
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.event.data.command == 'off_hold' }}"
+        sequence: !input off_hold
