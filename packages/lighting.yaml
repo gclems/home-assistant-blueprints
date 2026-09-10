@@ -1,0 +1,12 @@
+input_boolean:
+  bureau_natural_lights:
+    name: Bureau Natural Lights
+    icon: mdi:weather-sunny
+
+  chambre_natural_lights:
+    name: Chambre Natural Lights
+    icon: mdi:weather-sunny
+
+  salon_natural_lights:
+    name: Salon Natural Lights
+    icon: mdi:weather-sunny

@@ -1,0 +1,66 @@
+input_text:
+  natural_light_areas:
+    name: Natural Light — Pièces actives
+    initial: ""
+    max: 255
+    icon: mdi:weather-sunny
+script:
+  natural_light_enable_area:
+    alias: Natural Light — Activer une pièce
+    description: Inscrit une pièce au système Natural Light.
+    fields:
+      area:
+        name: Pièce
+        description: ID de l'Area à inscrire dans Natural Light.
+        required: true
+        selector:
+          area: null
+    sequence:
+      - variables:
+          current_areas: >
+            {{ states('input_text.natural_light_areas').split(';')
+               | map('trim')
+               | reject('equalto', '')
+               | list }}
+          target_area: "{{ area | string | trim }}"
+
+      - condition: template
+        value_template: "{{ target_area not in current_areas }}"
+
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.natural_light_areas
+        data:
+          value: >
+            {{ (current_areas + [target_area]) | join(';') }}
+    mode: single
+
+  natural_light_disable_area:
+    alias: Natural Light — Désactiver une pièce
+    description: Retire une pièce du système Natural Light.
+    fields:
+      area:
+        name: Pièce
+        description: ID de l'Area à retirer de Natural Light.
+        required: true
+        selector:
+          area: null
+    sequence:
+      - variables:
+          current_areas: >
+            {{ states('input_text.natural_light_areas').split(';')
+               | map('trim')
+               | reject('equalto', '')
+               | list }}
+          target_area: "{{ area | string | trim }}"
+
+      - condition: template
+        value_template: "{{ target_area in current_areas }}"
+
+      - action: input_text.set_value
+        target:
+          entity_id: input_text.natural_light_areas
+        data:
+          value: >
+            {{ current_areas | reject('equalto', target_area) | list | join(';') }}
+    mode: single
