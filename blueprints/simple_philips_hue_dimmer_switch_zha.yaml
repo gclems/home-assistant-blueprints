@@ -73,7 +73,7 @@ conditions:
 actions:
   - choose:
       # ============================================================
-      # POWER — SHORT PRESS
+      # POWER — SHORT PRESS -> Toggle lights calling the synchronized lighting script
       # ============================================================
 
       - conditions:
@@ -84,9 +84,10 @@ actions:
           - action: script.toggle_eclairage_synchronise
             data:
               area: "{{ target_area }}"
+              natural_lights: "{{ natural_lights_helper }}"
 
       # ============================================================
-      # POWER — HOLD
+      # POWER — HOLD -> No action defined
       # ============================================================
 
       - conditions:
@@ -96,7 +97,7 @@ actions:
         sequence: []
 
       # ============================================================
-      # BRIGHTNESS + — SHORT PRESS
+      # BRIGHTNESS + — SHORT PRESS -> Increase brightness by 5%
       # ============================================================
 
       - conditions:
@@ -111,7 +112,7 @@ actions:
               brightness_step_pct: 5
 
       # ============================================================
-      # BRIGHTNESS + — HOLD
+      # BRIGHTNESS + — HOLD -> Increase brightness by 10%
       # ============================================================
 
       - conditions:
@@ -126,7 +127,7 @@ actions:
               brightness_step_pct: 10
 
       # ============================================================
-      # BRIGHTNESS - — SHORT PRESS
+      # BRIGHTNESS - — SHORT PRESS -> Decrease brightness by 5%
       # ============================================================
 
       - conditions:
@@ -141,7 +142,7 @@ actions:
               brightness_step_pct: -5
 
       # ============================================================
-      # BRIGHTNESS - — HOLD
+      # BRIGHTNESS - — HOLD -> Decrease brightness by 10%
       # ============================================================
 
       - conditions:
@@ -156,7 +157,7 @@ actions:
               brightness_step_pct: -10
 
       # ============================================================
-      # HUE / OFF — SHORT PRESS
+      # HUE / OFF — SHORT PRESS -> Toggle natural lights
       # ============================================================
 
       - conditions:
@@ -169,7 +170,7 @@ actions:
               entity_id: !input natural_lights
 
       # ============================================================
-      # HUE / OFF — HOLD
+      # HUE / OFF — HOLD -> Forces all lights in the area off
       # ============================================================
 
       - conditions:
@@ -177,9 +178,8 @@ actions:
             value_template: >-
               {{ trigger.event.data.command == 'off_hold' }}
         sequence:
-          - action: light.turn_off
-            target:
-              entity_id: >-
-                {{ states.light
-                   | map(attribute='entity_id')
-                   | list }}
+          - action: script.toggle_eclairage_synchronise
+            data:
+              area: "{{ target_area }}"
+              natural_lights: "{{ natural_lights_helper }}"
+              state: "off"

@@ -1,0 +1,106 @@
+alias: "Toggle éclairage synchronisé"
+description: >
+  Contrôle de manière synchronisée l'éclairage d'une pièce.
+
+  À chaque appel, le mode Natural Light associé à la pièce est réactivé afin
+  que tout nouvel allumage démarre toujours avec l'éclairage automatique.
+  Natural Light peut ensuite être désactivé manuellement pour effectuer un
+  réglage personnalisé pendant que les lumières sont allumées.
+
+  Si aucun état cible n'est fourni, le script bascule l'éclairage :
+  - si au moins une lumière de la pièce est allumée, toutes les lumières
+    sont éteintes ;
+  - si aucune lumière de la pièce n'est allumée, toutes les lumières
+    sont allumées.
+
+  Si un état cible est fourni, le script force directement toutes les
+  lumières de la pièce dans cet état et ne procède pas à un toggle.
+
+  Le script constitue le point d'entrée pour les actions d'allumage et
+  d'extinction synchronisées d'une pièce.
+
+fields:
+  area:
+    name: Pièce
+    description: Pièce dont les lumières doivent être contrôlées
+    required: true
+    selector:
+      area: {}
+
+  natural_lights:
+    name: Natural lights
+    description: >
+      Helper Natural Light associé à la pièce. Il est réactivé avant
+      chaque action d'allumage ou d'extinction.
+    required: true
+    selector:
+      entity:
+        domain: input_boolean
+
+  state:
+    name: État cible
+    description: >
+      État cible optionnel des lumières. Si renseigné, force toutes les
+      lumières de la pièce à cet état au lieu d'effectuer un toggle.
+    required: false
+    selector:
+      select:
+        options:
+          - "on"
+          - "off"
+
+sequence:
+  - action: input_boolean.turn_on
+    target:
+      entity_id: "{{ natural_lights }}"
+
+  - choose:
+      # ============================================================
+      # ÉTAT EXPLICITE : ON
+      # ============================================================
+
+      - conditions:
+          - condition: template
+            value_template: "{{ state == 'on' }}"
+        sequence:
+          - action: light.turn_on
+            target:
+              area_id: "{{ area }}"
+
+      # ============================================================
+      # ÉTAT EXPLICITE : OFF
+      # ============================================================
+
+      - conditions:
+          - condition: template
+            value_template: "{{ state == 'off' }}"
+        sequence:
+          - action: light.turn_off
+            target:
+              area_id: "{{ area }}"
+
+    # ==============================================================
+    # AUCUN ÉTAT SPÉCIFIQUE : TOGGLE
+    # ==============================================================
+
+    default:
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: |
+                  {{ expand(area_entities(area))
+                     | selectattr('domain', 'eq', 'light')
+                     | selectattr('state', 'eq', 'on')
+                     | list
+                     | count > 0 }}
+            sequence:
+              - action: light.turn_off
+                target:
+                  area_id: "{{ area }}"
+
+        default:
+          - action: light.turn_on
+            target:
+              area_id: "{{ area }}"
+
+mode: single

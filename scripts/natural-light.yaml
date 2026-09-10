@@ -1,0 +1,273 @@
+```yaml
+alias: Natural Light
+description: >
+  Applique la courbe Natural Light à l'éclairage d'une pièce en fonction
+  de l'heure et du cycle solaire.
+
+  Par défaut, seules les lumières déjà allumées sont ajustées :
+  - température de couleur selon la position du soleil ;
+  - luminosité selon l'heure ;
+  - transitions douces lors des ajustements.
+
+  Avec `force_all_on` activé, toutes les lumières de la pièce sont ciblées,
+  y compris celles qui sont éteintes. Elles sont alors allumées directement
+  avec les valeurs Natural Light calculées, sans transition.
+mode: restart
+fields:
+  area:
+    name: Pièce
+    description: Pièce à laquelle appliquer Natural Light
+    required: true
+    selector:
+      area: null
+
+  heure_test:
+    name: Heure de test
+    description: Laisser vide pour utiliser l'heure actuelle
+    required: false
+    default: "12:00:00"
+    selector:
+      time: null
+
+  force_all_on:
+    name: Forcer l'allumage
+    description: >
+      Si activé, applique Natural Light à toutes les lumières de la pièce,
+      y compris celles qui sont actuellement éteintes, et les allume directement
+      avec les valeurs calculées.
+    required: false
+    default: false
+    selector:
+      boolean: {}
+
+sequence:
+  - variables:
+      should_force_all_on: "{{ force_all_on | default(false) }}"
+  - variables:
+      heure: "{{ heure_test | default(now().strftime('%H:%M:%S'), true) }}"
+      test_timestamp: |
+        {{ as_timestamp(today_at(heure)) }}
+      test_date: |
+        {{ today_at(heure) | as_timestamp
+           | timestamp_custom('%Y-%m-%d', true) }}
+      next_rising_timestamp: |
+        {{ as_timestamp(state_attr('sun.sun', 'next_rising')) }}
+      next_setting_timestamp: |
+        {{ as_timestamp(state_attr('sun.sun', 'next_setting')) }}
+
+  - variables:
+      next_rising_date: |
+        {{ next_rising_timestamp
+           | timestamp_custom('%Y-%m-%d', true) }}
+      next_setting_date: |
+        {{ next_setting_timestamp
+           | timestamp_custom('%Y-%m-%d', true) }}
+
+  - variables:
+      sunrise_timestamp: |
+        {% if next_rising_date == test_date %}
+          {{ next_rising_timestamp }}
+        {% else %}
+          {{ next_rising_timestamp - 86400 }}
+        {% endif %}
+      sunset_timestamp: |
+        {% if next_setting_date == test_date %}
+          {{ next_setting_timestamp }}
+        {% else %}
+          {{ next_setting_timestamp - 86400 }}
+        {% endif %}
+
+  - variables:
+      test_minutes: |
+        {{ (test_timestamp
+            | timestamp_custom('%H', true) | int) * 60
+           +
+           (test_timestamp
+            | timestamp_custom('%M', true) | int) }}
+      sunrise_minutes: |
+        {{ (sunrise_timestamp
+            | timestamp_custom('%H', true) | int) * 60
+           +
+           (sunrise_timestamp
+            | timestamp_custom('%M', true) | int) }}
+      sunset_minutes: |
+        {{ (sunset_timestamp
+            | timestamp_custom('%H', true) | int) * 60
+           +
+           (sunset_timestamp
+            | timestamp_custom('%M', true) | int) }}
+
+  - variables:
+      color_points: |
+        {% set points = [
+          [sunrise_minutes - 30, 2000],
+          [sunrise_minutes,      2700],
+          [sunrise_minutes + 60, 3500],
+          [sunrise_minutes + 180, 4200],
+          [sunrise_minutes + 300, 4500],
+          [sunset_minutes - 120, 4500],
+          [sunset_minutes - 60, 3500],
+          [sunset_minutes,       2700],
+          [sunset_minutes + 60,  2200],
+          [sunset_minutes + 120, 2000]
+        ] %} {{ points }}
+
+  - variables:
+      previous_color_point: >
+        {% set ns = namespace(point=color_points[0]) %}
+        {% for point in color_points %}
+          {% if point[0] <= test_minutes %}
+            {% set ns.point = point %}
+          {% endif %}
+        {% endfor %}
+        {{ ns.point }}
+
+      next_color_point: >
+        {% set ns = namespace(point=color_points[-1]) %}
+        {% for point in color_points %}
+          {% if point[0] > test_minutes %}
+            {% set ns.point = point %}
+            {% break %}
+          {% endif %}
+        {% endfor %}
+        {{ ns.point }}
+
+  - variables:
+      color_ratio: |
+        {% if next_color_point[0] == previous_color_point[0] %}
+          0
+        {% else %}
+          {{ (test_minutes - previous_color_point[0])
+             /
+             (next_color_point[0] - previous_color_point[0]) }}
+        {% endif %}
+
+      temperature: |
+        {{ (
+          previous_color_point[1]
+          +
+          (next_color_point[1] - previous_color_point[1])
+          * color_ratio
+        ) | round(0) }}
+
+  - variables:
+      brightness_points: |
+        {% set points = [
+          [0, 25],
+          [sunrise_minutes, 50],
+          [sunrise_minutes + 60, 70],
+          [sunrise_minutes + 180, 90],
+          [sunrise_minutes + 300, 100],
+          [sunset_minutes - 180, 90],
+          [sunset_minutes - 120, 80],
+          [sunset_minutes - 60, 70],
+          [sunset_minutes, 70],
+          [20 * 60, 55],
+          [22 * 60, 35],
+          [24 * 60, 25]
+        ] %} {{ points }}
+
+  - variables:
+      previous_brightness_point: >
+        {% set ns = namespace(point=brightness_points[0]) %}
+        {% for point in brightness_points %}
+          {% if point[0] <= test_minutes %}
+            {% set ns.point = point %}
+          {% endif %}
+        {% endfor %}
+        {{ ns.point }}
+
+      next_brightness_point: >
+        {% set ns = namespace(point=brightness_points[-1]) %}
+        {% for point in brightness_points %}
+          {% if point[0] > test_minutes %}
+            {% set ns.point = point %}
+            {% break %}
+          {% endif %}
+        {% endfor %}
+        {{ ns.point }}
+
+  - variables:
+      brightness_ratio: |
+        {% if next_brightness_point[0] == previous_brightness_point[0] %}
+          0
+        {% else %}
+          {{ (test_minutes - previous_brightness_point[0])
+             /
+             (next_brightness_point[0] - previous_brightness_point[0]) }}
+        {% endif %}
+
+      calculated_brightness: |
+        {{ (
+          previous_brightness_point[1]
+          +
+          (next_brightness_point[1] - previous_brightness_point[1])
+          * brightness_ratio
+        ) | round(0) }}
+
+  - variables:
+      brightness: |
+        {% if test_minutes < 6 * 60 %}
+
+          {{ [calculated_brightness | int, 25] | min }}
+
+        {% elif test_minutes < 9 * 60 %}
+
+          {% set ratio = (test_minutes - 6 * 60) / (3 * 60) %}
+          {{ (25 + (80 - 25) * ratio) | round(0) }}
+
+        {% elif test_minutes < 19 * 60 %}
+
+          {{ [calculated_brightness | int, 70] | max }}
+
+        {% else %}
+
+          {{ calculated_brightness | int }}
+
+        {% endif %}
+
+  - variables:
+      target_lights: |
+        {% if should_force_all_on %}
+          {{ expand(area_entities(area))
+             | selectattr('domain', 'eq', 'light')
+             | map(attribute='entity_id')
+             | list }}
+        {% else %}
+          {{ expand(area_entities(area))
+           | selectattr('domain', 'eq', 'light')
+           | selectattr('state', 'eq', 'on')
+           | map(attribute='entity_id')
+           | list }}
+        {% endif %}
+
+  - if:
+      - condition: template
+        value_template: "{{ target_lights | length > 0 }}"
+    then:
+      - repeat:
+          for_each: "{{ target_lights }}"
+          sequence:
+            - choose:
+                - conditions:
+                    - condition: template
+                      value_template: |
+                        {{ 'color_temp' in
+                           state_attr(repeat.item, 'supported_color_modes') }}
+                  sequence:
+                    - action: light.turn_on
+                      target:
+                        entity_id: "{{ repeat.item }}"
+                      data:
+                        color_temp_kelvin: "{{ temperature | int }}"
+                        brightness_pct: "{{ brightness | int }}"
+                        transition: "{{ 0 if should_force_all_on else 1 }}"
+
+              default:
+                - action: light.turn_on
+                  target:
+                    entity_id: "{{ repeat.item }}"
+                  data:
+                    brightness_pct: "{{ brightness | int }}"
+                    transition: "{{ 0 if should_force_all_on else 1 }}"
+```
