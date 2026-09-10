@@ -36,7 +36,7 @@ echo "==> Building automations.yaml"
 } > "$BUILD_DIR/automations.yaml"
 
 while IFS= read -r -d '' file; do
-    cat "$file"
+    sed '1s/^/- /; 2,$s/^/  /' "$file"
     echo
 done < <(
     find "$ROOT_DIR/automations" \
@@ -76,7 +76,7 @@ echo "==> Building scenes.yaml"
 
 if [[ -d "$ROOT_DIR/scenes" ]]; then
     while IFS= read -r -d '' file; do
-        cat "$file"
+        sed '1s/^/- /; 2,$s/^/  /' "$file"
         echo
     done < <(
         find "$ROOT_DIR/scenes" \

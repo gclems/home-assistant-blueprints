@@ -1,7 +1,7 @@
 alias: Interrupteur bureau
 description: ""
 use_blueprint:
-  path: gclems/simple_philips_hue_dimmer_switch_zha.yaml
+  path: hue/simple_philips_hue_dimmer_switch_zha.yaml
   input:
     controller: 35a5e0968a0c72944b8ef965fdc083e0
     area: bureau
