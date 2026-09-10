@@ -4,20 +4,20 @@ blueprint:
     Controls an area using a Philips Hue Dimmer Switch connected directly to ZHA.
 
     Buttons:
+
     - Power short press: toggle synchronized lighting for the area
     - Power hold: no action
     - Brightness + short press: +5%
     - Brightness + hold: +10%
     - Brightness - short press: -5%
     - Brightness - hold: -10%
-    - Hue/Off short press: toggle the area's natural lights helper
-    - Hue/Off hold: turn off every light in Home Assistant
+    - Hue/Off short press: toggle Natural Light for the area
+    - Hue/Off hold: turn off all lights in the area
 
-    The automation only provides the Dimmer Switch, the area and the
-    natural lights helper. All button behavior is defined by this blueprint.
-
+    The automation only provides the Dimmer Switch and the area.
+    All button behavior is defined by this blueprint.
   domain: automation
-  source_url: https://github.com/REPLACE_ME/hue-rom001-zha
+  source_url: https://github.com/gclems/home-assistant-blueprints
 
   input:
     controller:
@@ -35,18 +35,9 @@ blueprint:
       selector:
         area:
 
-    natural_lights:
-      name: Natural lights helper
-      description: >
-        Input boolean used to enable or disable natural lights for this area.
-      selector:
-        entity:
-          domain: input_boolean
-
 variables:
   controller_device: !input controller
   target_area: !input area
-  natural_lights_helper: !input natural_lights
 
 mode: parallel
 max: 20
@@ -73,9 +64,8 @@ conditions:
 actions:
   - choose:
       # ============================================================
-      # POWER — SHORT PRESS -> Toggle lights calling the synchronized lighting script
+      # POWER — SHORT PRESS -> Toggle lights using Natural Light
       # ============================================================
-
       - conditions:
           - condition: template
             value_template: >-
@@ -84,12 +74,10 @@ actions:
           - action: script.toggle_eclairage_synchronise
             data:
               area: "{{ target_area }}"
-              natural_lights: "{{ natural_lights_helper }}"
 
       # ============================================================
       # POWER — HOLD -> No action defined
       # ============================================================
-
       - conditions:
           - condition: template
             value_template: >-
@@ -99,7 +87,6 @@ actions:
       # ============================================================
       # BRIGHTNESS + — SHORT PRESS -> Increase brightness by 5%
       # ============================================================
-
       - conditions:
           - condition: template
             value_template: >-
@@ -114,7 +101,6 @@ actions:
       # ============================================================
       # BRIGHTNESS + — HOLD -> Increase brightness by 10%
       # ============================================================
-
       - conditions:
           - condition: template
             value_template: >-
@@ -129,7 +115,6 @@ actions:
       # ============================================================
       # BRIGHTNESS - — SHORT PRESS -> Decrease brightness by 5%
       # ============================================================
-
       - conditions:
           - condition: template
             value_template: >-
@@ -144,7 +129,6 @@ actions:
       # ============================================================
       # BRIGHTNESS - — HOLD -> Decrease brightness by 10%
       # ============================================================
-
       - conditions:
           - condition: template
             value_template: >-
@@ -157,22 +141,35 @@ actions:
               brightness_step_pct: -10
 
       # ============================================================
-      # HUE / OFF — SHORT PRESS -> Toggle natural lights
+      # HUE / OFF — SHORT PRESS -> Toggle Natural Light
       # ============================================================
-
       - conditions:
           - condition: template
             value_template: >-
               {{ trigger.event.data.command == 'off_short_release' }}
         sequence:
-          - action: input_boolean.toggle
-            target:
-              entity_id: !input natural_lights
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: >
+                      {{ target_area in
+                         states('input_text.natural_light_areas').split(';')
+                         | map('trim')
+                         | reject('equalto', '')
+                         | list }}
+                sequence:
+                  - action: script.natural_light_disable_area
+                    data:
+                      area: "{{ target_area }}"
+
+            default:
+              - action: script.natural_light_enable_area
+                data:
+                  area: "{{ target_area }}"
 
       # ============================================================
-      # HUE / OFF — HOLD -> Forces all lights in the area off
+      # HUE / OFF — HOLD -> Turn off all lights in the area
       # ============================================================
-
       - conditions:
           - condition: template
             value_template: >-
@@ -181,5 +178,4 @@ actions:
           - action: script.toggle_eclairage_synchronise
             data:
               area: "{{ target_area }}"
-              natural_lights: "{{ natural_lights_helper }}"
               state: "off"
