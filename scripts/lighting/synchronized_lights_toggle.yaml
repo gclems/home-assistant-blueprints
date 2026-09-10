@@ -2,19 +2,19 @@ alias: "Toggle éclairage synchronisé"
 description: >
   Contrôle de manière synchronisée l'éclairage d'une pièce.
 
-  À chaque appel, le mode Natural Light associé à la pièce est réactivé afin
+  À chaque appel, la pièce est inscrite dans le système Natural Light afin
   que tout nouvel allumage démarre toujours avec l'éclairage automatique.
+
   Natural Light peut ensuite être désactivé manuellement pour effectuer un
   réglage personnalisé pendant que les lumières sont allumées.
 
   Si aucun état cible n'est fourni, le script bascule l'éclairage :
-  - si au moins une lumière de la pièce est allumée, toutes les lumières
-    sont éteintes ;
-  - si aucune lumière de la pièce n'est allumée, toutes les lumières
-    sont allumées.
+  - si au moins une lumière de la pièce est allumée, toutes les lumières sont éteintes ;
+  - si aucune lumière de la pièce n'est allumée, toutes les lumières sont allumées
+    avec Natural Light.
 
-  Si un état cible est fourni, le script force directement toutes les
-  lumières de la pièce dans cet état et ne procède pas à un toggle.
+  Si un état cible est fourni, le script force directement toutes les lumières
+  de la pièce dans cet état.
 
   Le script constitue le point d'entrée pour les actions d'allumage et
   d'extinction synchronisées d'une pièce.
@@ -22,26 +22,16 @@ description: >
 fields:
   area:
     name: Pièce
-    description: Pièce dont les lumières doivent être contrôlées
+    description: Pièce dont l'éclairage doit être contrôlé
     required: true
     selector:
-      area: {}
-
-  natural_lights:
-    name: Natural lights
-    description: >
-      Helper Natural Light associé à la pièce. Il est réactivé avant
-      chaque action d'allumage ou d'extinction.
-    required: true
-    selector:
-      entity:
-        domain: input_boolean
+      area: null
 
   state:
     name: État cible
     description: >
-      État cible optionnel des lumières. Si renseigné, force toutes les
-      lumières de la pièce à cet état au lieu d'effectuer un toggle.
+      Si renseigné, force directement l'état de toutes les lumières.
+      Sinon, bascule automatiquement entre allumé et éteint.
     required: false
     selector:
       select:
@@ -50,27 +40,23 @@ fields:
           - "off"
 
 sequence:
-  - action: input_boolean.turn_on
-    target:
-      entity_id: "{{ natural_lights }}"
+  # Toute action d'éclairage synchronisé réactive Natural Light pour la pièce.
+  - action: script.natural_light_enable_area
+    data:
+      area: "{{ area }}"
 
   - choose:
-      # ============================================================
-      # ÉTAT EXPLICITE : ON
-      # ============================================================
-
+      # État explicitement demandé : ON
       - conditions:
           - condition: template
             value_template: "{{ state == 'on' }}"
         sequence:
-          - action: light.turn_on
-            target:
-              area_id: "{{ area }}"
+          - action: script.natural_light
+            data:
+              area: "{{ area }}"
+              force_all_on: true
 
-      # ============================================================
-      # ÉTAT EXPLICITE : OFF
-      # ============================================================
-
+      # État explicitement demandé : OFF
       - conditions:
           - condition: template
             value_template: "{{ state == 'off' }}"
@@ -79,12 +65,10 @@ sequence:
             target:
               area_id: "{{ area }}"
 
-    # ==============================================================
-    # AUCUN ÉTAT SPÉCIFIQUE : TOGGLE
-    # ==============================================================
-
+    # Aucun état demandé : véritable toggle.
     default:
       - choose:
+          # Au moins une lumière est déjà allumée → tout éteindre.
           - conditions:
               - condition: template
                 value_template: |
@@ -98,9 +82,11 @@ sequence:
                 target:
                   area_id: "{{ area }}"
 
+        # Aucune lumière allumée → allumer toute la pièce avec Natural Light.
         default:
-          - action: light.turn_on
-            target:
-              area_id: "{{ area }}"
+          - action: script.natural_light
+            data:
+              area: "{{ area }}"
+              force_all_on: true
 
 mode: single

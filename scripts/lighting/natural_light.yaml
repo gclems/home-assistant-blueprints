@@ -1,4 +1,3 @@
-```yaml
 alias: Natural Light
 description: >
   Applique la courbe Natural Light à l'éclairage d'une pièce en fonction
@@ -270,4 +269,3 @@ sequence:
                   data:
                     brightness_pct: "{{ brightness | int }}"
                     transition: "{{ 0 if should_force_all_on else 1 }}"
-```

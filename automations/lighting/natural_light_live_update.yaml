@@ -1,0 +1,25 @@
+alias: Natural Light - live update
+description: Met à jour Natural Light dans les pièces activées
+triggers:
+  - trigger: time_pattern
+    minutes: /5
+
+actions:
+  - variables:
+      natural_light_areas: >
+        {{ states('input_text.natural_light_areas').split(';')
+           | map('trim')
+           | reject('equalto', '')
+           | list }}
+
+  - repeat:
+      for_each: "{{ natural_light_areas }}"
+      sequence:
+        - action: script.turn_on
+          target:
+            entity_id: script.natural_light
+          data:
+            variables:
+              area: "{{ repeat.item }}"
+
+mode: single
