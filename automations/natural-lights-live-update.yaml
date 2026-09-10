@@ -1,4 +1,4 @@
-alias: Natural Lights - MàJ temps réel
+alias: Natrual Lights - MàJ temps réel
 description: Met à jour Natural Light dans les pièces activées
 triggers:
   - trigger: time_pattern

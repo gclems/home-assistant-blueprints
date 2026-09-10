@@ -1,0 +1,8 @@
+alias: Interrupteur salon
+description: ""
+use_blueprint:
+  path: gclems/simple-philips-hue-dimmer-switch-zha.yaml
+  input:
+    controller: ca0c1ff565b07004467141365daa8dae
+    area: salon
+    natural_lights: input_boolean.salon_natural_lights
