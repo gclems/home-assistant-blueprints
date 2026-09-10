@@ -1,22 +1,7 @@
 alias: Interrupteur chambre
 description: ""
 use_blueprint:
-  path: gclems/philips_hue_smart_button_zha.yaml
+  path: gclems/simple_philips_hue_smart_button_zha.yaml
   input:
     controller: 54028ec43528a6a3f8eabbef814a47fe
-    short_press:
-      - action: light.toggle
-        metadata: {}
-        target:
-          area_id: chambre
-        data:
-          brightness_pct: 50
-          color_temp_kelvin: 2555
-    hold:
-      - action: light.toggle
-        metadata: {}
-        target:
-          area_id: chambre
-        data:
-          brightness_pct: 100
-          color_temp_kelvin: 6500
+    area: chambre

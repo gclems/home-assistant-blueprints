@@ -5,4 +5,3 @@ use_blueprint:
   input:
     controller: 35a5e0968a0c72944b8ef965fdc083e0
     area: bureau
-    natural_lights: input_boolean.bureau_natural_lights
